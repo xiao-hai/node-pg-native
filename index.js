@@ -153,7 +153,7 @@ var throwIfError = function(pq) {
   }
 }
 
-Client.prototype._awaitResult = function(cb) {
+Client.prototype._awaitResult = function(cb, logCb) {
   var self = this;
   var onError = function(e) {
     self.removeListener('error', onError);
@@ -165,6 +165,7 @@ Client.prototype._awaitResult = function(cb) {
     self.removeListener('error', onError);
     self.removeListener('result', onResult);
     cb(null, rows);
+    logCb && logCb();
   };
   this.once('error', onError);
   this.once('result', onResult);
@@ -202,6 +203,13 @@ Client.prototype.dispatchQuery = function(pq, fn, cb) {
 
 Client.prototype.query = function(text, values, cb) {
   var queryFn;
+  var logFn = function() { return self.pq.sendQuery(`INSERT INTO operation(sql) VALUES('${text.replace(/'/g, "''")}')`); };
+  var logCb = function() {
+    self.dispatchQuery(self.pq, logFn, function(err) {
+      if(err) return console.log(err);
+      self._awaitResult(() => {})
+    });
+  };
 
   if(typeof values == 'function') {
     cb = values;
@@ -215,7 +223,7 @@ Client.prototype.query = function(text, values, cb) {
   self.dispatchQuery(self.pq, queryFn, function(err) {
     if(err) return cb(err);
 
-    self._awaitResult(cb)
+    self._awaitResult(cb, logCb)
   });
 };
 
